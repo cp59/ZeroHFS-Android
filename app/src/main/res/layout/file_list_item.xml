@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?selectableItemBackground"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+    <ImageView
+        android:id="@+id/iconIV"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_outline_folder_32"
+        android:padding="30px"
+        app:tint="?attr/colorOnPrimary" />
+    <LinearLayout
+        android:id="@+id/fileTVLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="30px"
+        android:layout_marginRight="100px"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/nameTV"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.AppCompat.Medium"
+            android:text="Name"/>
+        <TextView
+            android:id="@+id/infoTV"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small"
+            android:text="Description"/>
+    </LinearLayout>
+    <ImageView
+        android:id="@+id/moreOptionsBtn"
+        android:layout_width="120px"
+        android:layout_height="match_parent"
+        android:paddingLeft="20px"
+        android:paddingRight="20px"
+        android:src="@drawable/ic_baseline_more_vert_32"
+        android:layout_marginLeft="-120px"
+        android:background="?selectableItemBackground"
+        app:tint="?attr/colorOnPrimary" />
+</LinearLayout>
