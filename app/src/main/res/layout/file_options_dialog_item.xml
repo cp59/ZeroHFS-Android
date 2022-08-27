@@ -9,14 +9,14 @@
 
     <ImageView
         android:id="@+id/iv1"
-        android:layout_width="80px"
-        android:layout_height="80px"
+        android:layout_width="70px"
+        android:layout_height="70px"
         android:layout_marginLeft="10dp"
         android:src="@mipmap/ic_launcher_round"/>
 
     <TextView
         android:id="@+id/tv1"
-        android:layout_marginLeft="20px"
+        android:layout_marginLeft="30px"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_weight="1"

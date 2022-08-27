@@ -5,7 +5,8 @@
     android:layout_height="wrap_content"
     android:background="?selectableItemBackground"
     android:gravity="center_vertical"
-    android:orientation="horizontal">
+    android:orientation="horizontal"
+    android:padding="15px">
     <ImageView
         android:id="@+id/iconIV"
         android:layout_width="wrap_content"
@@ -25,7 +26,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textAppearance="@style/TextAppearance.AppCompat.Medium"
-            android:text="Name"/>
+            android:text="Name"
+            android:ellipsize="middle"
+            android:singleLine="true" />
         <TextView
             android:id="@+id/infoTV"
             android:layout_width="wrap_content"

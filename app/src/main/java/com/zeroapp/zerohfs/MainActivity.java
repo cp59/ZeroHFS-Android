@@ -1,5 +1,6 @@
 package com.zeroapp.zerohfs;
 
+import android.app.Activity;
 import android.app.DownloadManager;
 import android.app.ProgressDialog;
 import android.content.ContentValues;
@@ -7,6 +8,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
+import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Bundle;
@@ -56,7 +58,7 @@ import moe.feng.common.view.breadcrumbs.DefaultBreadcrumbsCallback;
 import moe.feng.common.view.breadcrumbs.model.BreadcrumbItem;
 
 public class MainActivity extends AppCompatActivity {
-    private String serverUrl = "http://192.168.0.137:8000";
+    private String serverUrl = "about:blank";
     private String currentPath = "/";
     private RequestQueue requestQueue;
     private ListView filesListView;
@@ -101,7 +103,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         SQLDataBaseHelper sqlDataBaseHelper = new SQLDataBaseHelper(this, DataBaseName, null, DataBaseVersion, DataBaseTable);
         db = sqlDataBaseHelper.getWritableDatabase();
-        switchProfile(1);
         processProgressDialog = new ProgressDialog(MainActivity.this);
         processProgressDialog.setMessage(getString(R.string.processing_changes  ));
         processProgressDialog.setCancelable(false);
@@ -115,7 +116,6 @@ public class MainActivity extends AppCompatActivity {
             startActivityForResult(chooseFile, 0);
         });
         topAppBar = findViewById(R.id.topAppBar);
-        topAppBar.setSubtitle(serverUrl.replace("http://","").replace("https://",""));
         topAppBar.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
                 case R.id.accountOptions:
@@ -161,6 +161,7 @@ public class MainActivity extends AppCompatActivity {
         breadcrumbsView.setCallback(new DefaultBreadcrumbsCallback<BreadcrumbItem>() {
             @Override
             public void onNavigateBack(BreadcrumbItem item, int position) {
+                position+=1;
                 for (int i = 0;i < dirDeep-position;i++) {
                     try {
                         currentPath = getParentDirPath(currentPath);
@@ -181,7 +182,14 @@ public class MainActivity extends AppCompatActivity {
         filesListView.setOnItemClickListener((parent, view, position, id) -> onFilesListItemClicked(position));
         requestQueue = Volley.newRequestQueue(this);
         downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-        loadFolder();
+        if (DatabaseUtils.queryNumEntries(db,"Servers")!=0) {
+            switchProfile(1);
+            topAppBar.setTitle(getString(R.string.connecting));
+            topAppBar.setSubtitle(serverUrl);
+            loadFolder();
+        } else {
+            openAddServerDialog(new String[0],true);
+        }
     }
     public void onFilesListItemClicked(int position) {
         if (filesList!=null) {
@@ -218,6 +226,7 @@ public class MainActivity extends AppCompatActivity {
                                 .setPositiveButton(getString(android.R.string.ok), null)
                                 .show();
                     });
+                    oneTimeAccessTokenRequest.setShouldCache(false);
                     requestQueue.add(oneTimeAccessTokenRequest);
                 }
             } catch (JSONException e) {
@@ -308,7 +317,11 @@ public class MainActivity extends AppCompatActivity {
                                     break;
                             }
                             file.put("name", fileResp.getString("name").replace(currentPath, "").replace("/", ""));
-                            file.put("info", fileResp.getString("modifyTime") + "   " + fileResp.getString("filesize"));
+                            if (fileResp.getString("filesize").equals("")) {
+                                file.put("info", fileResp.getString("modifyTime"));
+                            } else {
+                                file.put("info", fileResp.getString("modifyTime") + "  |  " + fileResp.getString("filesize"));
+                            }
                             hmFiles.add(file);
                         }
                     } catch (Exception e) {
@@ -350,7 +363,59 @@ public class MainActivity extends AppCompatActivity {
             filesListView.setAdapter(errorsAdapter);
             swipeRefreshLayout.setRefreshing(false);
         });
+        jsonObjectRequest.setShouldCache(false);
         requestQueue.add(jsonObjectRequest);
+    }
+    private void openAddServerDialog(String[] serverUrlArray,boolean initMode) {
+        AlertDialog.Builder addServerDialog = new AlertDialog.Builder(MainActivity.this);
+        addServerDialog.setTitle(getString(R.string.add_server));
+        LayoutInflater inflater = getLayoutInflater();
+        View addServerView = inflater.inflate(R.layout.add_server_dialog, null);
+        addServerDialog.setView(addServerView);
+        addServerDialog.setOnCancelListener(dialog -> {openServerManager();});
+        addServerDialog.setCancelable(!initMode);
+        if (!initMode) {
+            addServerDialog.setNegativeButton(getString(android.R.string.cancel), (dialog, which) -> {openServerManager();});
+        }
+        addServerDialog.setPositiveButton(getString(android.R.string.ok), (dialog2, which2) -> {
+            String newServerUrl = ((TextInputLayout)addServerView.findViewById(R.id.serverUrlTextField)).getEditText().getText().toString();
+            if (!URLUtil.isValidUrl(newServerUrl)) {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle(getString(R.string.invalid_server_address))
+                        .setOnDismissListener(initMode ? dialog13 -> openAddServerDialog(new String[0],true) : dialog13 -> openServerManager())
+                        .setPositiveButton(getString(android.R.string.ok), null)
+                        .show();
+            } else {
+                try {
+                    newServerUrl = newServerUrl.substring(0, newServerUrl.indexOf("/", newServerUrl.indexOf("/", newServerUrl.indexOf("/") + 1) + 1));
+                } catch (Exception e) {
+
+                }
+                if (Arrays.asList(serverUrlArray).contains(newServerUrl)){
+                    new AlertDialog.Builder(MainActivity.this)
+                            .setTitle(getString(R.string.server_exists))
+                            .setOnDismissListener(dialog14 -> openServerManager())
+                            .setPositiveButton(getString(android.R.string.ok), null)
+                            .show();
+                } else {
+                    ContentValues contentValues = new ContentValues();
+                    contentValues.put("serverUrl", newServerUrl);
+                    contentValues.putNull("account");
+                    contentValues.putNull("password");
+                    db.insert(DataBaseTable, null, contentValues);
+                    if (initMode) {
+                        switchProfile(1);
+                        topAppBar.setTitle(getString(R.string.connecting));
+                        topAppBar.setSubtitle(serverUrl);
+                        loadFolder();
+
+                    } else {
+                        openServerManager();
+                    }
+                }
+            }
+        });
+        addServerDialog.show();
     }
     private void openServerManager() {
         Cursor c = db.rawQuery("SELECT * FROM " + DataBaseTable,null);
@@ -378,44 +443,7 @@ public class MainActivity extends AppCompatActivity {
         new AlertDialog.Builder(MainActivity.this)
                 .setTitle(getString(R.string.server_manager))
                 .setPositiveButton(getString(R.string.add_server), (dialog1, which1) -> {
-                    AlertDialog.Builder addServerDialog = new AlertDialog.Builder(MainActivity.this);
-                    addServerDialog.setTitle(getString(R.string.add_server));
-                    LayoutInflater inflater = getLayoutInflater();
-                    View addServerView = inflater.inflate(R.layout.add_server_dialog, null);
-                    addServerDialog.setView(addServerView);
-                    addServerDialog.setOnCancelListener(dialog -> {openServerManager();});
-                    addServerDialog.setNegativeButton(getString(android.R.string.cancel), (dialog, which) -> {openServerManager();});
-                    addServerDialog.setPositiveButton(getString(android.R.string.ok), (dialog2, which2) -> {
-                        String newServerUrl = ((TextInputLayout)addServerView.findViewById(R.id.serverUrlTextField)).getEditText().getText().toString();
-                        if (!URLUtil.isValidUrl(newServerUrl)) {
-                            new AlertDialog.Builder(MainActivity.this)
-                                    .setTitle(getString(R.string.invalid_server_address))
-                                    .setOnDismissListener(dialog13 -> openServerManager())
-                                    .setPositiveButton(getString(android.R.string.ok), null)
-                                    .show();
-                        } else {
-                            try {
-                                newServerUrl = newServerUrl.substring(0, newServerUrl.indexOf("/", newServerUrl.indexOf("/", newServerUrl.indexOf("/") + 1) + 1));
-                            } catch (Exception e) {
-
-                            }
-                            if (Arrays.asList(serverUrlArray).contains(newServerUrl)){
-                                new AlertDialog.Builder(MainActivity.this)
-                                        .setTitle(getString(R.string.server_exists))
-                                        .setOnDismissListener(dialog14 -> openServerManager())
-                                        .setPositiveButton(getString(android.R.string.ok), null)
-                                        .show();
-                            } else {
-                                ContentValues contentValues = new ContentValues();
-                                contentValues.put("serverUrl", newServerUrl);
-                                contentValues.putNull("account");
-                                contentValues.putNull("password");
-                                db.insert(DataBaseTable, null, contentValues);
-                                openServerManager();
-                            }
-                        }
-                    });
-                    addServerDialog.show();
+                    openAddServerDialog(serverUrlArray,false);
                 })
                 .setItems(serverUrlArrayDisplay, (dialog, which) -> {
                     new AlertDialog.Builder(MainActivity.this)
@@ -483,7 +511,8 @@ public class MainActivity extends AppCompatActivity {
             if (position == 0) {
                 try {
                     if (((JSONObject) filesJson.get(reqPath)).getString("filetype").equals("folder")) {
-
+                        CustomTabsIntent customTabsIntent = new CustomTabsIntent.Builder().build();
+                        customTabsIntent.launchUrl(MainActivity.this, Uri.parse(addLoginArgs(serverUrl+reqPath+"?action=download")));
                     } else {
                         Uri downloadUri = Uri.parse(addLoginArgs(serverUrl+reqPath+"?from=ZHFSAndroidClient"));
                         DownloadManager.Request downloadRequest = new DownloadManager.Request(downloadUri);
@@ -512,6 +541,7 @@ public class MainActivity extends AppCompatActivity {
                                         .setPositiveButton(getString(android.R.string.ok), null)
                                         .show();
                             });
+                            deleteRequest.setShouldCache(false);
                             requestQueue.add(deleteRequest);
                         })
                         .setNegativeButton(getString(android.R.string.cancel),null)
@@ -538,7 +568,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode==0) {
+        if (requestCode==0 && resultCode == Activity.RESULT_OK) {
             try {
                 new MultipartUploadRequest(MainActivity.this,addLoginArgs(serverUrl+currentPath+"?action=upload"))
                         .addFileToUpload(data.getData().toString(), "file")
